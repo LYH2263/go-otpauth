@@ -54,12 +54,23 @@ func (l *Logger) Close() error {
 func (l *Logger) Rotate(newPath string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	f, err := os.OpenFile(newPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	nf, err := os.OpenFile(newPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
+		// Old handle stays active; rotation is a no-op on failure.
 		return err
 	}
-	// leak old handle
-	l.f = f
+	old := l.f
+	l.f = nf
 	l.path = newPath
+	// Release the rotated-out handle so the old audit file can be archived
+	// or deleted. On Windows an open handle holds a sharing lock on the
+	// file, which is the "sharing violation" the archive script trips over
+	// while the old audit logs pile up on disk. Closing only after the new
+	// handle is in place keeps the logger writable throughout.
+	if old != nil {
+		if err := old.Close(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
