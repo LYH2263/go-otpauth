@@ -26,6 +26,12 @@ func (v *Verifier) AttemptCount(id string) int {
 }
 
 func (v *Verifier) VerifyID(id, code string) error {
+	// Guard the missing-clock wiring error before any side effect: a nil Clock
+	// is a caller misconfiguration, not a genuine verify attempt, so it must
+	// not leave a half-baked entry in the attempt/risk-control book.
+	if v.Clock == nil {
+		return ErrNoClock
+	}
 	sec, err := v.Reg.Get(id)
 	if err != nil {
 		return err
@@ -34,9 +40,6 @@ func (v *Verifier) VerifyID(id, code string) error {
 		v.Attempts.Note(id)
 	}
 	t := v.Clock.Now()
-	if v.Clock == nil {
-		return ErrNoClock
-	}
 	if v.Win.Verify(sec, code, t) {
 		return nil
 	}
