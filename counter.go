@@ -22,9 +22,11 @@ func (c *CounterStore) Consume(id string) (uint64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	next := c.cur[id] + 1
-	c.cur[id] = next
+	// 先落盘，成功后才提交内存计数；落盘失败时内存保持原值，
+	// 重试仍得到同一个 next，不会跳号或"偷偷消耗"口令。
 	if err := persistCounter(c.path, id, next); err != nil {
 		return 0, err
 	}
+	c.cur[id] = next
 	return next, nil
 }
