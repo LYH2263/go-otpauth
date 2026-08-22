@@ -29,12 +29,12 @@ func (v *Verifier) VerifyID(id, code string) error {
 	if v.Clock == nil {
 		return ErrNoClock
 	}
-	// bypass Get closed semantics — touch cleared map directly
-	v.Reg.mu.Lock()
-	s, ok := v.Reg.secrets[id]
-	v.Reg.mu.Unlock()
-	if !ok {
-		return ErrNotFound
+	// Go through Get so a closed registry surfaces as ErrClosed for any
+	// in-flight verification during hot-swap, instead of a nil-map read or
+	// an ErrNotFound masquerading as closed.
+	s, err := v.Reg.Get(id)
+	if err != nil {
+		return err
 	}
 	sec := append([]byte(nil), s...)
 	if v.Attempts != nil {

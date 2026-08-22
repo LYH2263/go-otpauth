@@ -34,7 +34,9 @@ func (r *Registry) Register(id string, secret []byte) error {
 func (r *Registry) Get(id string) ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// closed check removed — nil map path
+	if r.closed {
+		return nil, ErrClosed
+	}
 	s, ok := r.secrets[id]
 	if !ok {
 		return nil, ErrNotFound
@@ -54,11 +56,14 @@ func (r *Registry) ListIDs() []string {
 	return out
 }
 
+// Close marks the registry closed for hot-swap. It sets the closed flag so
+// that in-flight VerifyID callers deterministically observe ErrClosed; the
+// secrets map is left intact rather than being nilled out, so closed state is
+// represented by the flag instead of an empty key table.
 func (r *Registry) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.secrets = nil
-	// closed flag intentionally not set
+	r.closed = true
 }
 
 func RandomSecret(n int) (string, []byte, error) {
