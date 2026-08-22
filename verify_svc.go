@@ -40,5 +40,8 @@ func (v *Verifier) VerifyID(id, code string) error {
 	if v.Win.Verify(sec, code, t) {
 		return nil
 	}
-	return fmt.Errorf("code miss at %s", t.UTC().Format(time.RFC3339))
+	// Code is outside the valid window (including allowed skew). Wrap it with
+	// ErrSkew so callers/monitoring can classify it via errors.Is(err, ErrSkew)
+	// instead of string-matching the message.
+	return SkewFail(fmt.Errorf("code miss at %s", t.UTC().Format(time.RFC3339)))
 }
