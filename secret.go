@@ -25,7 +25,11 @@ func (r *Registry) Register(id string, secret []byte) error {
 	if id == "" || len(secret) == 0 {
 		return ErrInvalid
 	}
-	r.secrets[id] = secret
+	// Store an independent copy so the registry does not alias the caller's
+	// buffer; later mutation of that buffer must not corrupt the stored key.
+	cp := make([]byte, len(secret))
+	copy(cp, secret)
+	r.secrets[id] = cp
 	return nil
 }
 
